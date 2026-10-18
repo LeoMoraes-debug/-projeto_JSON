@@ -1,16 +1,158 @@
-<html>
-    <head>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Consulta de jogos</title>
+    <style>
+        :root {
+            --fundo: #12261c;
+            --painel: #1c3a2b;
+            --texto: #eef8f1;
+            --texto-suave: #a9c9b6;
+            --destaque: #3ddc84;
+            --apoio: #9af2bd;
+        }
 
-    </head>
-    <body>
-            <center>
-            <form action = "backend/jogos.php"
-                  method = "post">
+        * { box-sizing: border-box; }
 
-                  <input name = "jogo" type = "text" placeholder = "Digite o nome do jogo">
-                  <input value = "Consultar" type = "submit">          
-                
-            </form>
-            <div>#dados</div>
-    </body>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 12vh 20px 40px;
+            background: var(--fundo);
+            color: var(--texto);
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        }
+
+        main {
+            width: 100%;
+            max-width: 560px;
+        }
+
+        h1 {
+            margin: 0 0 6px;
+            font-size: 2.2rem;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitulo {
+            margin: 0 0 28px;
+            color: var(--texto-suave);
+        }
+
+        form {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            min-width: 0;
+            padding: 14px 16px;
+            border: 2px solid transparent;
+            border-radius: 10px;
+            background: var(--painel);
+            color: var(--texto);
+            font-size: 1rem;
+        }
+
+        input[type="text"]::placeholder { color: var(--texto-suave); }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--apoio);
+        }
+
+        input[type="submit"] {
+            padding: 14px 22px;
+            border: 0;
+            border-radius: 10px;
+            background: var(--destaque);
+            color: #0e2118;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        input[type="submit"]:hover { filter: brightness(1.1); }
+
+        input[type="submit"]:focus-visible {
+            outline: 3px solid var(--apoio);
+            outline-offset: 2px;
+        }
+
+        .resultado {
+            margin-top: 28px;
+            padding: 20px 22px;
+            border-left: 5px solid var(--apoio);
+            border-radius: 0 10px 10px 0;
+            background: var(--painel);
+            font-size: 1.05rem;
+            line-height: 1.7;
+            overflow-wrap: anywhere;
+        }
+
+        /* some quando ainda não há resultado */
+        .resultado:empty { display: none; }
+
+        .nota {
+            display: block;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid var(--fundo);
+            font-size: 2.2rem;
+            font-weight: bold;
+            line-height: 1.1;
+            color: var(--destaque);
+        }
+
+        .nota::before {
+            content: "Nota";
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.9rem;
+            font-weight: normal;
+            color: var(--texto-suave);
+        }
+
+        @media (max-width: 480px) {
+            form { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Consulta de jogos</h1>
+        <p class="subtitulo">Digite o nome e veja lançamento, gêneros e nota.</p>
+
+        <form action="backend/jogos.php" method="post">
+            <input name="jogo" type="text" placeholder="Digite o nome do jogo" required autofocus>
+            <input value="Consultar" type="submit">
+        </form>
+
+        <div class="resultado">#dados</div>
+    </main>
+
+    <script>
+        // O PHP imprime a nota depois de um <br>. Aqui ela é isolada
+        // e recebe a classe "nota", sem mexer no back end.
+        const caixa = document.querySelector(".resultado");
+        const quebra = caixa.querySelector("br");
+
+        if (quebra && quebra.nextSibling) {
+            const valor = quebra.nextSibling.textContent.trim();
+            const nota = document.createElement("span");
+            nota.className = "nota";
+            nota.textContent = isNaN(valor) ? valor : "★ " + valor + " / 5";
+
+            quebra.nextSibling.remove();
+            quebra.replaceWith(nota);
+        }
+    </script>
+</body>
 </html>

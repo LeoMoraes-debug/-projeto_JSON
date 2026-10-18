@@ -12,6 +12,7 @@
             --texto-suave: #a9c9b6;
             --destaque: #3ddc84;
             --apoio: #9af2bd;
+            --alerta: #ffb454;
         }
 
         * { box-sizing: border-box; }
@@ -22,7 +23,7 @@
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            padding: 12vh 20px 40px;
+            padding: 8vh 20px 40px;
             background: var(--fundo);
             color: var(--texto);
             font-family: "Trebuchet MS", "Segoe UI", sans-serif;
@@ -81,13 +82,20 @@
 
         input[type="submit"]:hover { filter: brightness(1.1); }
 
-        input[type="submit"]:focus-visible {
+        input[type="submit"]:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        input[type="submit"]:focus-visible,
+        .limpar:focus-visible {
             outline: 3px solid var(--apoio);
             outline-offset: 2px;
         }
 
-        .resultado {
-            margin-top: 28px;
+        /* cartão de resultado (também usado se a página for enviada sem JavaScript) */
+        .resultado,
+        .item {
             padding: 20px 22px;
             border-left: 5px solid var(--apoio);
             border-radius: 0 10px 10px 0;
@@ -96,6 +104,8 @@
             line-height: 1.7;
             overflow-wrap: anywhere;
         }
+
+        .resultado { margin-top: 28px; }
 
         /* some quando ainda não há resultado */
         .resultado:empty { display: none; }
@@ -120,6 +130,54 @@
             color: var(--texto-suave);
         }
 
+        /* contador e botão de limpar */
+        .barra {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 28px;
+            color: var(--texto-suave);
+        }
+
+        .barra[hidden] { display: none; }
+
+        .limpar {
+            padding: 6px 14px;
+            border: 1px solid var(--texto-suave);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--texto-suave);
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .limpar:hover {
+            border-color: var(--texto);
+            color: var(--texto);
+        }
+
+        /* lista de pesquisas com barra de rolagem vertical */
+        .historico {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 420px;
+            margin-top: 12px;
+            padding-right: 8px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--destaque) var(--painel);
+        }
+
+        .historico:empty { display: none; }
+
+        .item { flex-shrink: 0; }
+
+        .item.erro {
+            border-left-color: var(--alerta);
+            color: var(--alerta);
+        }
+
         @media (max-width: 480px) {
             form { flex-direction: column; }
         }
@@ -131,21 +189,43 @@
         <p class="subtitulo">Digite o nome e veja lançamento, gêneros e nota.</p>
 
         <form action="backend/jogos.php" method="post">
-            <input name="jogo" type="text" placeholder="Digite o nome do jogo" required autofocus>
+            <input name="jogo" type="text" placeholder="Digite o nome do jogo" required autofocus autocomplete="off">
             <input value="Consultar" type="submit">
         </form>
 
         <div class="resultado">#dados</div>
+
+        <div class="barra" hidden>
+            <span class="contador"></span>
+            <button type="button" class="limpar">Limpar lista</button>
+        </div>
+        <div class="historico" aria-live="polite"></div>
     </main>
 
     <script>
+        const form = document.querySelector("form");
+        const campo = form.querySelector('input[name="jogo"]');
+        const botao = form.querySelector('input[type="submit"]');
+        const historico = document.querySelector(".historico");
+        const barra = document.querySelector(".barra");
+        const contador = document.querySelector(".contador");
+        const limpar = document.querySelector(".limpar");
+
+        function atualizarBarra() {
+            const total = historico.children.length;
+            barra.hidden = total === 0;
+            contador.textContent = total + (total === 1 ? " jogo pesquisado" : " jogos pesquisados");
+        }
+
         // O PHP imprime a nota depois de um <br>. Aqui ela é isolada
         // e recebe a classe "nota", sem mexer no back end.
-        const caixa = document.querySelector(".resultado");
-        const quebra = caixa.querySelector("br");
+        function destacarNota(item) {
+            const quebra = item.querySelector("br");
+            if (!quebra || !quebra.nextSibling) return;
 
-        if (quebra && quebra.nextSibling) {
             const valor = quebra.nextSibling.textContent.trim();
+            if (valor === "") return;
+
             const nota = document.createElement("span");
             nota.className = "nota";
             nota.textContent = isNaN(valor) ? valor : "★ " + valor + " / 5";
@@ -153,6 +233,63 @@
             quebra.nextSibling.remove();
             quebra.replaceWith(nota);
         }
+
+        function adicionar(conteudo, ehErro) {
+            const item = document.createElement("div");
+            item.className = ehErro ? "item erro" : "item";
+
+            if (typeof conteudo === "string") {
+                item.textContent = conteudo;
+            } else {
+                conteudo.childNodes.forEach(function (no) {
+                    item.append(document.importNode(no, true));
+                });
+                destacarNota(item);
+            }
+
+            // a pesquisa mais recente fica no topo da lista
+            historico.prepend(item);
+            historico.scrollTop = 0;
+            atualizarBarra();
+        }
+
+        form.addEventListener("submit", async function (evento) {
+            evento.preventDefault();
+            if (campo.value.trim() === "") return;
+
+            botao.disabled = true;
+            botao.value = "Buscando...";
+
+            try {
+                // envia o mesmo formulário para o jogos.php, sem recarregar a página
+                const resposta = await fetch(form.action, {
+                    method: "POST",
+                    body: new FormData(form)
+                });
+                const html = await resposta.text();
+                const doc = new DOMParser().parseFromString(html, "text/html");
+                const resultado = doc.querySelector(".resultado");
+
+                if (resultado && resultado.textContent.trim() !== "") {
+                    adicionar(resultado, false);
+                } else {
+                    adicionar(doc.body.textContent.trim() || "Não foi possível consultar o jogo.", true);
+                }
+            } catch (erro) {
+                adicionar("Não foi possível conectar ao servidor. Confira se o XAMPP está ligado.", true);
+            } finally {
+                botao.disabled = false;
+                botao.value = "Consultar";
+                campo.value = "";
+                campo.focus();
+            }
+        });
+
+        limpar.addEventListener("click", function () {
+            historico.replaceChildren();
+            atualizarBarra();
+            campo.focus();
+        });
     </script>
 </body>
 </html>
